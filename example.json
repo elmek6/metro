@@ -1,0 +1,61 @@
+{
+  "seedVersion": 4,
+  "settings": {
+    "bgColor": "#1f3a4d",
+    "orientation": "columns",
+    "colWrap": 4,
+    "rowWrap": 8,
+    "darkness": 0,
+    "sleepSeconds": 0
+  },
+  "groups": [
+    { "id": "g_google",  "title": "Grup 1",  "order": 0 },
+    { "id": "g_shop",    "title": "Grup 2",  "order": 1 },
+    { "id": "g_3p",      "title": "3.parti", "order": 2 },
+    { "id": "g_tools",   "title": "Grup 4",  "order": 3 },
+    { "id": "g_browser", "title": "Grup 5",  "order": 4 }
+  ],
+  "tiles": [
+    { "id": "t_clock", "type": "clock", "color": "#00aba9", "groupId": "g_google", "order": 0 },
+    { "id": "t01", "type": "shortcut", "title": "Gmail",        "url": "https://mail.google.com",  "color": "#e51400", "groupId": "g_google", "order": 1, "iconType": "favicon", "iconRef": null },
+    { "id": "t02", "type": "shortcut", "title": "Outlook",      "url": "https://outlook.live.com", "color": "#1ba1e2", "groupId": "g_google", "order": 2, "iconType": "favicon", "iconRef": null },
+    { "id": "t03", "type": "shortcut", "title": "Yahoo Mail",   "url": "https://mail.yahoo.com",   "color": "#6a00ff", "groupId": "g_google", "order": 3, "iconType": "favicon", "iconRef": null },
+    { "id": "t04", "type": "shortcut", "title": "facebook",     "url": "https://facebook.com",     "color": "#0050ef", "groupId": "g_google", "order": 4, "iconType": "favicon", "iconRef": null },
+    { "id": "t05", "type": "shortcut", "title": "Docs",         "url": "https://docs.google.com",  "color": "#1ba1e2", "groupId": "g_google", "order": 5, "iconType": "favicon", "iconRef": null },
+    { "id": "t06", "type": "shortcut", "title": "Slides",       "url": "https://slides.google.com","color": "#f0a30a", "groupId": "g_google", "order": 6, "iconType": "favicon", "iconRef": null },
+    { "id": "t07", "type": "shortcut", "title": "Sheets",       "url": "https://sheets.google.com","color": "#008a00", "groupId": "g_google", "order": 7, "iconType": "favicon", "iconRef": null },
+    { "id": "t08", "type": "shortcut", "title": "Google Drive", "url": "https://drive.google.com", "color": "#00aba9", "groupId": "g_google", "order": 8, "iconType": "favicon", "iconRef": null },
+    { "id": "t09", "type": "shortcut", "title": "Photo",        "url": "https://photos.google.com","color": "#fa6800", "groupId": "g_google", "order": 9, "iconType": "favicon", "iconRef": null },
+
+    { "id": "t10", "type": "shortcut", "title": "ebay.de",            "url": "https://ebay.de",          "color": "#f0a30a", "groupId": "g_shop", "order": 0, "iconType": "favicon", "iconRef": null },
+    { "id": "t11", "type": "shortcut", "title": "ebay.com",           "url": "https://ebay.com",         "color": "#e3c800", "groupId": "g_shop", "order": 1, "iconType": "favicon", "iconRef": null },
+    { "id": "t12", "type": "shortcut", "title": "amazon.de",          "url": "https://amazon.de",        "color": "#825a2c", "groupId": "g_shop", "order": 2, "iconType": "favicon", "iconRef": null },
+    { "id": "t13", "type": "shortcut", "title": "amazon",             "url": "https://amazon.com",       "color": "#fa6800", "groupId": "g_shop", "order": 3, "iconType": "favicon", "iconRef": null },
+    { "id": "t14", "type": "shortcut", "title": "paypal.de",          "url": "https://paypal.de",        "color": "#0050ef", "groupId": "g_shop", "order": 4, "iconType": "favicon", "iconRef": null },
+    { "id": "t15", "type": "shortcut", "title": "PayPal",             "url": "https://paypal.com",       "color": "#1ba1e2", "groupId": "g_shop", "order": 5, "iconType": "favicon", "iconRef": null },
+    { "id": "t16", "type": "shortcut", "title": "eBay Kleinanzeigen", "url": "https://kleinanzeigen.de", "color": "#e51400", "groupId": "g_shop", "order": 6, "iconType": "favicon", "iconRef": null },
+    { "id": "t17", "type": "shortcut", "title": "aliexpress.com",     "url": "https://aliexpress.com",   "color": "#fa6800", "groupId": "g_shop", "order": 7, "iconType": "favicon", "iconRef": null },
+    { "id": "t18", "type": "shortcut", "title": "my bidder",          "url": "https://www.mybidder.com", "color": "#e3c800", "groupId": "g_shop", "order": 8, "iconType": "favicon", "iconRef": null },
+
+    { "id": "t19", "type": "shortcut", "title": "teknoseyir",        "url": "https://teknoseyir.com",         "color": "#a20025", "groupId": "g_3p", "order": 0, "iconType": "favicon", "iconRef": null },
+    { "id": "t20", "type": "shortcut", "title": "DonanimHaber",      "url": "https://donanimhaber.com",       "color": "#fa6800", "groupId": "g_3p", "order": 1, "iconType": "favicon", "iconRef": null },
+    { "id": "t21", "type": "shortcut", "title": "Muhendis Beyinler", "url": "https://muhendisbeyinler.net",   "color": "#6d8764", "groupId": "g_3p", "order": 2, "iconType": "favicon", "iconRef": null },
+    { "id": "t22", "type": "shortcut", "title": "dg",                "url": "https://www.donanimgunlugu.com", "color": "#1ba1e2", "groupId": "g_3p", "order": 3, "iconType": "favicon", "iconRef": null },
+    { "id": "t23", "type": "shortcut", "title": "kadinlar",          "url": "https://www.kadinlarkulubu.com", "color": "#d80073", "groupId": "g_3p", "order": 4, "iconType": "favicon", "iconRef": null },
+    { "id": "t24", "type": "shortcut", "title": "YouTube",           "url": "https://youtube.com",            "color": "#e51400", "groupId": "g_3p", "order": 5, "iconType": "favicon", "iconRef": null },
+
+    { "id": "t25", "type": "shortcut", "title": "Evernote",         "url": "https://evernote.com",     "color": "#60a917", "groupId": "g_tools", "order": 0, "iconType": "favicon", "iconRef": null },
+    { "id": "t26", "type": "shortcut", "title": "web.airdroid.com", "url": "https://web.airdroid.com", "color": "#e51400", "groupId": "g_tools", "order": 1, "iconType": "favicon", "iconRef": null },
+    { "id": "t27", "type": "shortcut", "title": "dropbox.com",      "url": "https://dropbox.com",      "color": "#1ba1e2", "groupId": "g_tools", "order": 2, "iconType": "favicon", "iconRef": null },
+    { "id": "t28", "type": "shortcut", "title": "mydealz.de",       "url": "https://mydealz.de",       "color": "#008a00", "groupId": "g_tools", "order": 3, "iconType": "favicon", "iconRef": null },
+    { "id": "t29", "type": "shortcut", "title": "puhutv",           "url": "https://puhutv.com",       "color": "#008a00", "groupId": "g_tools", "order": 4, "iconType": "favicon", "iconRef": null },
+    { "id": "t30", "type": "shortcut", "title": "MonsterDealz.de",  "url": "https://monsterdealz.de",  "color": "#e51400", "groupId": "g_tools", "order": 5, "iconType": "favicon", "iconRef": null },
+    { "id": "t31", "type": "shortcut", "title": "AirDroid",         "url": "https://airdroid.com",     "color": "#60a917", "groupId": "g_tools", "order": 6, "iconType": "favicon", "iconRef": null },
+    { "id": "t32", "type": "shortcut", "title": "Handyhase.de",     "url": "https://handyhase.de",     "color": "#1ba1e2", "groupId": "g_tools", "order": 7, "iconType": "favicon", "iconRef": null },
+    { "id": "t33", "type": "shortcut", "title": "HandyRaketen",     "url": "https://handyraketen.de",  "color": "#647687", "groupId": "g_tools", "order": 8, "iconType": "favicon", "iconRef": null },
+
+    { "id": "t34", "type": "shortcut", "title": "Weather",          "url": "https://weather.com",               "color": "#1ba1e2", "groupId": "g_browser", "order": 0, "iconType": "favicon", "iconRef": null },
+    { "id": "t35", "type": "shortcut", "title": "Chrome Web Store", "url": "https://chromewebstore.google.com", "color": "#e51400", "groupId": "g_browser", "order": 1, "iconType": "favicon", "iconRef": null },
+    { "id": "t36", "type": "shortcut", "title": "UnityMedia",       "url": "https://unitymedia.de",             "color": "#fa6800", "groupId": "g_browser", "order": 2, "iconType": "favicon", "iconRef": null }
+  ]
+}

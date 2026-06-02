@@ -1,0 +1,306 @@
+/* Metro New Tab — flat, gridded, Windows 8 "Modern UI" look.
+   The board never scrolls: tile size is computed so everything fits. */
+
+:root {
+  --tile: 120px;     /* tile edge length (set by the fit() routine) */
+  --gap: 8px;        /* gap between tiles */
+  --footer-h: 36px;  /* bottom bar height */
+  --rows: 4;         /* columns layout: tile rows per column */
+  --cols: 8;         /* rows layout: tile columns per row */
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;                /* no page scrollbars, ever */
+  font-family: "Segoe UI", Tahoma, "Helvetica Neue", Arial, sans-serif;
+  color: #fff;
+  background: #1f3a4d;             /* overridden from settings on load */
+}
+
+/* ---------- Bottom bar (settings trigger) ---------- */
+#page-footer {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  height: var(--footer-h);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0 16px;
+  z-index: 41;
+}
+.ghost-btn {
+  background: transparent; border: none; color: #fff;
+  opacity: .55; cursor: pointer; font-size: 14px; padding: 6px 10px;
+}
+.ghost-btn:hover { opacity: 1; }
+.ghost-btn.small { font-size: 13px; opacity: .85; border: 1px solid #555; padding: 7px 10px; }
+.ghost-btn.small:hover { background: #1c1c1c; }
+#settings-btn { font-size: 14px; }
+
+/* ---------- Board ---------- */
+#board {
+  position: absolute;
+  left: 0; right: 0;
+  top: 0; bottom: var(--footer-h);
+  display: flex;
+  padding: 10px 22px;
+  overflow: hidden;
+}
+#board.columns { flex-direction: row; gap: 46px; }
+#board.rows    { flex-direction: column; gap: 22px; }
+
+.group { flex: 0 0 auto; }
+
+.tiles {
+  display: grid;
+  gap: var(--gap);
+  align-content: start;
+}
+#board.columns .tiles {
+  grid-auto-flow: column;
+  grid-template-rows: repeat(var(--rows), var(--tile));
+  grid-auto-columns: var(--tile);
+}
+#board.rows .tiles {
+  grid-auto-flow: row;
+  grid-template-columns: repeat(var(--cols), var(--tile));
+}
+
+/* ---------- Group title (editable) ---------- */
+.group-title {
+  margin: 0 0 8px 2px;
+  min-height: 26px;
+  min-width: 60px;
+  font-weight: 300;
+  font-size: 20px;
+  opacity: .92;
+  cursor: default;
+  outline: none;
+}
+.group-title:empty::before {
+  content: "(untitled)";
+  opacity: .35;
+  font-style: italic;
+}
+.group-title.editing {
+  cursor: text;
+  background: rgba(0, 0, 0, .35);
+  padding: 1px 6px;
+  margin-left: -4px;
+}
+
+/* ---------- Tile ---------- */
+.tile {
+  position: relative;
+  width: var(--tile);
+  height: var(--tile);
+  background: #1ba1e2;
+  color: #fff;
+  text-decoration: none;
+  overflow: hidden;
+  cursor: pointer;
+  user-select: none;
+  transition: transform .08s ease;
+}
+.tile:hover { outline: 2px solid rgba(255, 255, 255, .8); outline-offset: -2px; }
+.tile:active { transform: scale(.96); }
+
+.tile .favicon {
+  position: absolute;
+  top: 44%; left: 50%;
+  width: calc(var(--tile) * 0.37);
+  height: calc(var(--tile) * 0.37);
+  transform: translate(-50%, -50%);
+  object-fit: contain;
+}
+.tile .letter {
+  position: absolute;
+  top: 44%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: calc(var(--tile) * 0.42);
+  font-weight: 300;
+}
+
+/* Readability: dark gradient behind the label + strong shadow. */
+.tile.shortcut::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 42%;
+  background: linear-gradient(transparent, rgba(0, 0, 0, .55));
+  pointer-events: none;
+}
+.tile .label {
+  position: absolute;
+  left: 7%; right: 7%; bottom: 6%;
+  z-index: 1;
+  font-size: clamp(10px, calc(var(--tile) * 0.115), 16px);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .9), 0 0 2px rgba(0, 0, 0, .8);
+}
+
+/* "Add tile" placeholder */
+.tile.add {
+  background: transparent;
+  border: 2px dashed rgba(255, 255, 255, .35);
+  display: flex; align-items: center; justify-content: center;
+}
+.tile.add::before {
+  content: "+";
+  font-size: calc(var(--tile) * 0.4);
+  font-weight: 200;
+  opacity: .55;
+}
+.tile.add:hover { border-color: rgba(255, 255, 255, .85); outline: none; }
+
+/* Live clock tile */
+.tile.clock {
+  display: flex; flex-direction: column;
+  justify-content: center; align-items: flex-start;
+  padding: 0 10%;
+}
+.tile.clock .time    { font-size: calc(var(--tile) * 0.30); font-weight: 300; line-height: 1; }
+.tile.clock .weekday { font-size: calc(var(--tile) * 0.12); opacity: .95; margin-top: 6%; }
+.tile.clock .date    { font-size: calc(var(--tile) * 0.105); opacity: .8; margin-top: 2%; }
+
+/* Drag-and-drop visuals */
+.drag-ghost  { opacity: .35; }
+.drag-chosen { outline: 2px solid #fff; outline-offset: -2px; }
+
+/* ---------- Context menu ---------- */
+.ctx-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 160px;
+  padding: 4px;
+  background: #2b2b2b;
+  border: 1px solid #555;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .5);
+}
+.ctx-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: #fff;
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ctx-item:hover { background: #1ba1e2; }
+.ctx-item.danger:hover { background: #e51400; }
+.ctx-sep { height: 1px; margin: 4px 0; background: #444; }
+
+/* ---------- Dim + sleep overlays ---------- */
+#dim-overlay {
+  position: fixed; inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;     /* never blocks interaction */
+  z-index: 5;               /* dims the board, not the panels */
+  transition: opacity .2s ease;
+}
+#sleep-overlay {
+  position: fixed; inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 9998;            /* above everything when asleep */
+  transition: opacity .8s ease;
+}
+#sleep-overlay.on { opacity: 1; pointer-events: auto; cursor: none; }
+
+/* ---------- Settings panel ---------- */
+#settings-panel {
+  position: fixed;
+  bottom: calc(var(--footer-h) + 6px);
+  right: 12px;
+  width: 290px;
+  max-height: calc(100vh - var(--footer-h) - 24px);
+  overflow-y: auto;
+  padding: 18px;
+  background: #2b2b2b;
+  border: 1px solid #444;
+  z-index: 42;
+}
+#settings-panel h3 { margin: 0 0 14px; font-weight: 300; font-size: 18px; }
+.set-row { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.set-row.dual { flex-direction: row; gap: 8px; }
+.set-row.dual .ghost-btn { flex: 1; }
+.set-sep { height: 1px; margin: 4px 0 16px; background: #444; }
+.set-label { font-size: 13px; opacity: .85; }
+.set-label .hint { opacity: .55; }
+#darkness { width: 100%; direction: rtl; }
+#darkness-val { opacity: .6; }
+#sleep-num {
+  width: 72px; padding: 6px 8px;
+  background: #1c1c1c; border: 1px solid #555; color: #fff; font-size: 14px;
+}
+.set-version { margin-top: 4px; font-size: 12px; opacity: .45; text-align: center; }
+
+.seg { display: flex; border: 1px solid #555; width: fit-content; }
+.seg button {
+  background: #1c1c1c; color: #fff; border: none;
+  padding: 7px 16px; cursor: pointer; font-size: 13px;
+}
+.seg button.active { background: #1ba1e2; }
+
+#wrap-num {
+  width: 72px; padding: 6px 8px;
+  background: #1c1c1c; border: 1px solid #555; color: #fff; font-size: 14px;
+}
+
+.bg-controls { display: flex; align-items: center; gap: 8px; }
+#bg-swatches { display: flex; gap: 6px; }
+#bg-swatches .bg-sw { width: 22px; height: 22px; cursor: pointer; border: 2px solid transparent; }
+#bg-swatches .bg-sw.selected { border-color: #fff; }
+#bg-color { width: 32px; height: 26px; padding: 0; border: 1px solid #555; background: none; cursor: pointer; }
+
+/* ---------- Modal ---------- */
+#modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, .55);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50;
+}
+.hidden { display: none !important; }
+
+#tile-modal {
+  width: 360px; max-width: 92vw;
+  padding: 24px;
+  background: #2b2b2b; border: 1px solid #444;
+}
+#tile-modal h2 { margin: 0 0 18px; font-weight: 300; }
+#tile-modal label { display: block; margin-bottom: 14px; font-size: 13px; opacity: .9; }
+#tile-modal input[type="url"],
+#tile-modal input[type="text"] {
+  width: 100%; margin-top: 6px; padding: 8px 10px;
+  background: #1c1c1c; border: 1px solid #555; color: #fff; font-size: 14px;
+}
+#tile-modal input:focus { outline: none; border-color: #1ba1e2; }
+.live-note { margin: 0 0 14px; font-size: 13px; opacity: .75; line-height: 1.4; }
+
+#color-swatches { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.swatch { width: 26px; height: 26px; cursor: pointer; border: 2px solid transparent; }
+.swatch.selected { border-color: #fff; }
+
+.modal-actions { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.modal-actions .spacer { flex: 1; }
+
+button.primary {
+  background: #1ba1e2; color: #fff; border: none;
+  padding: 8px 18px; cursor: pointer; font-size: 14px;
+}
+button.primary:hover { background: #1f9fd8; }
+button.danger {
+  background: #e51400; color: #fff; border: none;
+  padding: 8px 14px; cursor: pointer; font-size: 14px;
+}
+button.danger:hover { background: #c91200; }

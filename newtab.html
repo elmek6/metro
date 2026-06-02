@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>New Tab</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main id="board"><!-- groups & tiles are rendered here --></main>
+
+  <!-- Dimming + sleep overlays -->
+  <div id="dim-overlay"></div>
+  <div id="sleep-overlay"></div>
+
+  <!-- Bottom bar with the settings trigger -->
+  <footer id="page-footer">
+    <button id="settings-btn" class="ghost-btn" title="Settings">&#9881; Settings</button>
+  </footer>
+
+  <!-- Settings panel (rises from the bottom) -->
+  <div id="settings-panel" class="hidden">
+    <h3>Settings</h3>
+
+    <div class="set-row">
+      <span class="set-label">Layout</span>
+      <div class="seg" id="layout-seg">
+        <button data-layout="columns">Columns</button>
+        <button data-layout="rows">Rows</button>
+      </div>
+    </div>
+
+    <div class="set-row">
+      <span class="set-label" id="wrap-label">Tiles per column</span>
+      <input type="number" id="wrap-num" min="1" max="20" step="1">
+    </div>
+
+    <div class="set-row">
+      <span class="set-label">Background</span>
+      <div class="bg-controls">
+        <div id="bg-swatches"></div>
+        <input type="color" id="bg-color" title="Custom color">
+      </div>
+    </div>
+
+    <div class="set-row">
+      <span class="set-label">Darkness <span id="darkness-val">0%</span></span>
+      <input type="range" id="darkness" min="0" max="80" step="5">
+    </div>
+
+    <div class="set-row">
+      <span class="set-label">Sleep in seconds <span class="hint">(0 = off)</span></span>
+      <input type="number" id="sleep-num" min="0" max="3600" step="5">
+    </div>
+
+    <div class="set-sep"></div>
+
+    <div class="set-row">
+      <button id="addgroup-btn" class="ghost-btn small">+ Add new group</button>
+    </div>
+
+    <div class="set-row dual">
+      <button id="export-btn" class="ghost-btn small">Export JSON</button>
+      <button id="import-btn" class="ghost-btn small">Import JSON</button>
+      <input type="file" id="import-file" accept="application/json" class="hidden">
+    </div>
+
+    <div class="set-row">
+      <button id="new-metro-btn" class="ghost-btn small">New Metro (blank)</button>
+    </div>
+
+    <div class="set-version" id="set-version"></div>
+  </div>
+
+  <!-- Add / Edit tile modal -->
+  <div id="modal-backdrop" class="hidden">
+    <div id="tile-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h2 id="modal-title">Add Tile</h2>
+
+      <div id="type-row" class="set-row">
+        <span class="set-label">Type</span>
+        <div class="seg" id="type-seg">
+          <button data-type="shortcut">URL</button>
+          <button data-type="clock">Live tile</button>
+        </div>
+      </div>
+
+      <label id="row-url">URL
+        <input type="url" id="f-url" placeholder="https://example.com" autocomplete="off">
+      </label>
+
+      <label id="row-title">Title
+        <input type="text" id="f-title" placeholder="Example" autocomplete="off">
+      </label>
+
+      <p id="row-live" class="live-note hidden">Live tile: a clock showing time, weekday &amp; date.</p>
+
+      <label>Color
+        <div id="color-swatches"></div>
+      </label>
+
+      <div class="modal-actions">
+        <button id="modal-delete" class="danger hidden">Delete</button>
+        <span class="spacer"></span>
+        <button id="modal-cancel" class="ghost-btn">Cancel</button>
+        <button id="modal-save" class="primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right-click context menu (groups) -->
+  <div id="context-menu" class="ctx-menu hidden"></div>
+
+  <script src="Sortable.min.js"></script>
+  <script src="store.js"></script>
+  <script src="newtab.js"></script>
+</body>
+</html>

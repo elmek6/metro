@@ -1,0 +1,11 @@
+# Claude Code local memory / session data
+.claude/
+
+# Personal backups created by Export JSON (may contain private bookmarks)
+links/
+
+# Misc
+node_modules/
+*.log
+.DS_Store
+Thumbs.db

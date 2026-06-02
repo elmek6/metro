@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Metro New Tab",
+  "version": "0.3.0",
+  "description": "A Windows 8 Metro-style new tab page: colored tiles, groups, drag-and-drop, and live tiles.",
+  "permissions": ["storage", "favicon"],
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  }
+}
