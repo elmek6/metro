@@ -22,11 +22,18 @@ let modalType = 'shortcut';// 'shortcut' | 'clock' — what the modal is editing
 let pickedColor = PALETTE[4];
 let clockEls = [];         // {time, weekday, date} element triples for the clock
 let sortables = [];        // active Sortable instances (destroyed before re-render)
+let cookieMode = 'accept'; // 'accept' | 'reject' | 'off' — auto cookie-banner handling
+
+// Cookie-banner mode lives in its own light storage key (read by the
+// cookie-consent.js content script on every page), separate from the board
+// state so the content script never has to load the whole metroState.
+const COOKIE_KEY = 'metroCookieMode';
 
 init();
 
 async function init() {
   state = await Store.load();
+  await loadCookieMode();
   applyBackground();
   applyDarkness();
   buildColorSwatches();
@@ -585,6 +592,14 @@ function wireSettings() {
     resetSleep();
   });
 
+  document.getElementById('cookie-seg').addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-cookie]');
+    if (!btn) return;
+    cookieMode = btn.dataset.cookie;
+    await chrome.storage.local.set({ [COOKIE_KEY]: cookieMode });
+    syncSettingsUI();
+  });
+
   document.getElementById('addgroup-btn').addEventListener('click', addGroup);
   document.getElementById('export-btn').addEventListener('click', exportJson);
   document.getElementById('import-btn').addEventListener('click', importJsonFlow);
@@ -635,6 +650,24 @@ function syncSettingsUI() {
   document.getElementById('darkness').value = dk;
   document.getElementById('darkness-val').textContent = dk + '%';
   document.getElementById('sleep-num').value = state.settings.sleepSeconds || 0;
+
+  document.querySelectorAll('#cookie-seg button').forEach(b => {
+    b.classList.toggle('active', b.dataset.cookie === cookieMode);
+  });
+}
+
+// Read the saved cookie-banner mode (defaults to 'accept' and writes it back
+// so the content script has an explicit value to read).
+async function loadCookieMode() {
+  try {
+    const got = await chrome.storage.local.get(COOKIE_KEY);
+    const m = got && got[COOKIE_KEY];
+    if (m === 'accept' || m === 'reject' || m === 'off') {
+      cookieMode = m;
+    } else {
+      await chrome.storage.local.set({ [COOKIE_KEY]: cookieMode });
+    }
+  } catch (_) {}
 }
 
 function toHex(c) {

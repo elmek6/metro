@@ -4,6 +4,15 @@
   "version": "0.3.0",
   "description": "A Windows 8 Metro-style new tab page: colored tiles, groups, drag-and-drop, and live tiles.",
   "permissions": ["storage", "favicon"],
+  "host_permissions": ["<all_urls>"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["cookie-consent.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
   "chrome_url_overrides": {
     "newtab": "newtab.html"
   }
