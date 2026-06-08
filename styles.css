@@ -20,17 +20,69 @@ html, body {
   background: #1f3a4d;             /* overridden from settings on load */
 }
 
-/* ---------- Bottom bar (settings trigger) ---------- */
+/* ---------- Bottom bar (open-tab search + settings trigger) ---------- */
 #page-footer {
   position: fixed;
   left: 0; right: 0; bottom: 0;
   height: var(--footer-h);
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   padding: 0 16px;
   z-index: 41;
 }
+
+/* ---------- Open-tab search (footer left) ---------- */
+#tabsearch { position: relative; width: 280px; max-width: 40vw; }
+#tabsearch-input {
+  width: 100%;
+  padding: 7px 10px;
+  background: rgba(0, 0, 0, .25);
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 2px;
+  color: #fff;
+  font-size: 13px;
+  font-family: inherit;
+}
+#tabsearch-input::placeholder { color: rgba(255, 255, 255, .45); }
+#tabsearch-input:focus { outline: none; border-color: #1ba1e2; background: rgba(0, 0, 0, .4); }
+
+/* Results rise above the input */
+#tabsearch-results {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: calc(100% + 6px);
+  max-height: 50vh;
+  overflow-y: auto;
+  background: #252525;
+  border: 1px solid #444;
+  border-radius: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .5);
+  padding: 4px 0;
+}
+#tabsearch-results::-webkit-scrollbar { width: 4px; }
+#tabsearch-results::-webkit-scrollbar-thumb { background: #444; border-radius: 2px; }
+
+.ts-row {
+  display: flex;
+  align-items: flex-start;       /* favicon stays at top when the title wraps */
+  gap: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.ts-row:hover, .ts-row.active { background: #1ba1e2; }
+.ts-row img { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; }
+.ts-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ts-title {
+  font-size: 13px; color: #fff; line-height: 1.3;
+  overflow-wrap: anywhere;       /* wrap long titles instead of truncating */
+}
+.ts-url {
+  font-size: 11px; opacity: .6; line-height: 1.3;
+  overflow-wrap: anywhere;       /* show the full URL, wrapped if needed */
+}
+.ts-row:hover .ts-url, .ts-row.active .ts-url { opacity: .85; }
+.ts-empty { padding: 14px; font-size: 12px; opacity: .4; text-align: center; }
 .ghost-btn {
   background: transparent; border: none; color: #fff;
   opacity: .55; cursor: pointer; font-size: 14px; padding: 6px 10px;

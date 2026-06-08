@@ -38,6 +38,7 @@ async function init() {
   wireModal();
   wireSettings();
   wireTabVault();
+  wireTabSearch();
   render();
   renderTabVault();
   startClock();
@@ -873,6 +874,133 @@ async function idbSet(key, val) {
     tx.oncomplete = () => res();
     tx.onerror = () => rej(tx.error);
   });
+}
+
+/* ---------------- Open-tab search (footer) ----------------
+ *
+ * Searches every open tab in every window (title + URL). Clicking a result
+ * focuses that window and activates the tab. Each result shows the full title
+ * (wrapped) and the full URL.
+ */
+
+const TS_CAP = 12;             // max results shown
+let tsResults = [];            // current result tabs, in displayed order
+let tsActive = -1;             // keyboard-highlighted index
+let myTabId = -1;              // this New Tab page's own tab (excluded)
+
+function wireTabSearch() {
+  const input = document.getElementById('tabsearch-input');
+
+  chrome.tabs.getCurrent().then(t => { if (t) myTabId = t.id; }).catch(() => {});
+
+  input.addEventListener('input', runTabSearch);
+  input.addEventListener('focus', () => { if (input.value.trim()) runTabSearch(); });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { clearTabSearch(); input.blur(); return; }
+    if (tsResults.length === 0) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); moveTsActive(1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); moveTsActive(-1); }
+    else if (e.key === 'Enter') {
+      e.preventDefault();
+      const tab = tsResults[tsActive] || tsResults[0];
+      if (tab) activateTab(tab);
+    }
+  });
+
+  // Hide on outside click / blur (delayed so a result click still lands).
+  document.addEventListener('click', (e) => {
+    if (!document.getElementById('tabsearch').contains(e.target)) hideTsResults();
+  });
+  input.addEventListener('blur', () => setTimeout(hideTsResults, 150));
+}
+
+async function runTabSearch() {
+  const q = document.getElementById('tabsearch-input').value.trim().toLowerCase();
+  if (!q) { hideTsResults(); return; }
+
+  const tabs = await chrome.tabs.query({});
+  tsResults = tabs
+    .filter(t => t.id !== myTabId && t.url && !t.url.startsWith('chrome://newtab'))
+    .filter(t =>
+      (t.title || '').toLowerCase().includes(q) ||
+      (t.url || '').toLowerCase().includes(q))
+    .slice(0, TS_CAP);
+  tsActive = tsResults.length ? 0 : -1;
+  renderTsResults();
+}
+
+function renderTsResults() {
+  const box = document.getElementById('tabsearch-results');
+  box.innerHTML = '';
+  box.classList.remove('hidden');
+
+  if (tsResults.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'ts-empty';
+    empty.textContent = 'No open tabs match';
+    box.appendChild(empty);
+    return;
+  }
+
+  tsResults.forEach((tab, i) => {
+    const row = document.createElement('div');
+    row.className = 'ts-row' + (i === tsActive ? ' active' : '');
+
+    const img = document.createElement('img');
+    img.src = tab.favIconUrl || faviconURL(tab.url, 16);
+    img.alt = '';
+    img.addEventListener('error', () => { img.src = faviconURL(tab.url, 16); }, { once: true });
+
+    const text = document.createElement('div');
+    text.className = 'ts-text';
+    const title = document.createElement('span');
+    title.className = 'ts-title';
+    title.textContent = tab.title || hostnameOf(tab.url);
+    const url = document.createElement('span');
+    url.className = 'ts-url';
+    url.textContent = tab.url;
+    text.append(title, url);
+
+    row.append(img, text);
+    row.addEventListener('click', () => activateTab(tab));
+    row.addEventListener('mouseenter', () => { tsActive = i; highlightTsActive(); });
+    box.appendChild(row);
+  });
+}
+
+function moveTsActive(delta) {
+  if (tsResults.length === 0) return;
+  tsActive = (tsActive + delta + tsResults.length) % tsResults.length;
+  highlightTsActive();
+  const rows = document.querySelectorAll('#tabsearch-results .ts-row');
+  const el = rows[tsActive];
+  if (el) el.scrollIntoView({ block: 'nearest' });
+}
+
+function highlightTsActive() {
+  document.querySelectorAll('#tabsearch-results .ts-row').forEach((el, i) => {
+    el.classList.toggle('active', i === tsActive);
+  });
+}
+
+// Focus the window and select the tab.
+async function activateTab(tab) {
+  try {
+    await chrome.tabs.update(tab.id, { active: true });
+    if (tab.windowId != null) await chrome.windows.update(tab.windowId, { focused: true });
+  } catch (_) {}
+}
+
+function hideTsResults() {
+  document.getElementById('tabsearch-results').classList.add('hidden');
+}
+
+function clearTabSearch() {
+  document.getElementById('tabsearch-input').value = '';
+  tsResults = [];
+  tsActive = -1;
+  hideTsResults();
 }
 
 /* ---------------- Settings panel ---------------- */

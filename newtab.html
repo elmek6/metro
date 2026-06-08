@@ -12,8 +12,12 @@
   <div id="dim-overlay"></div>
   <div id="sleep-overlay"></div>
 
-  <!-- Bottom bar with the settings trigger -->
+  <!-- Bottom bar: open-tab search on the left, settings trigger on the right -->
   <footer id="page-footer">
+    <div id="tabsearch">
+      <input type="text" id="tabsearch-input" placeholder="Search open tabs…" autocomplete="off">
+      <div id="tabsearch-results" class="hidden"></div>
+    </div>
     <button id="settings-btn" class="ghost-btn" title="Settings">&#9881; Settings</button>
   </footer>
 
