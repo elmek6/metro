@@ -116,6 +116,29 @@
     </div>
   </div>
 
+  <!-- Tab Vault — right slide-in panel -->
+  <div id="tabvault">
+    <button id="tv-trigger" title="Saved tabs" aria-label="Saved tabs">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="4" width="16" height="5" rx="1"></rect>
+        <rect x="4" y="11" width="16" height="5" rx="1"></rect>
+        <line x1="7" y1="20" x2="17" y2="20"></line>
+      </svg>
+    </button>
+    <div id="tv-panel">
+      <div id="tv-top">
+        <div class="seg" id="tv-view-seg">
+          <button data-view="active" class="active">Active</button>
+          <button data-view="archive">Archive</button>
+        </div>
+        <input type="text" id="tv-search" placeholder="Search tabs…" autocomplete="off">
+        <button id="tv-backup" class="primary">Backup &#9662;</button>
+      </div>
+      <div id="tv-lists"></div>
+    </div>
+  </div>
+
   <!-- Right-click context menu (groups) -->
   <div id="context-menu" class="ctx-menu hidden"></div>
 

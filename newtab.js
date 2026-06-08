@@ -23,6 +23,8 @@ let pickedColor = PALETTE[4];
 let clockEls = [];         // {time, weekday, date} element triples for the clock
 let sortables = [];        // active Sortable instances (destroyed before re-render)
 let cookieMode = 'accept'; // 'accept' | 'reject' | 'off' — auto cookie-banner handling
+let tvView = 'active';     // Tab Vault view: 'active' | 'archive'
+const TV_CAP = 30;         // max lists kept per view (active / archive)
 
 // Cookie-banner mode lives in its own light storage key (read by the
 // cookie-consent.js content script on every page), separate from the board
@@ -42,7 +44,9 @@ async function init() {
     'Metro New Tab v' + chrome.runtime.getManifest().version;
   wireModal();
   wireSettings();
+  wireTabVault();
   render();
+  renderTabVault();
   startClock();
 
   window.addEventListener('resize', scheduleFit);
@@ -520,6 +524,346 @@ function idbOpen() {
     r.onerror = () => rej(r.error);
   });
 }
+/* ---------------- Tab Vault ---------------- */
+
+function wireTabVault() {
+  const vault = document.getElementById('tabvault');
+
+  // Click the side tab to open/close. Always starts closed (not persisted).
+  document.getElementById('tv-trigger').addEventListener('click', (e) => {
+    e.stopPropagation();
+    vault.classList.toggle('open');
+  });
+
+  // Close when clicking anywhere outside the panel, or on Escape. Clicks inside
+  // our own dropdown (#context-menu, e.g. Backup / This group) don't count.
+  document.addEventListener('click', (e) => {
+    const menu = document.getElementById('context-menu');
+    if (vault.classList.contains('open') && !vault.contains(e.target) && !menu.contains(e.target)) {
+      vault.classList.remove('open');
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') vault.classList.remove('open');
+  });
+
+  // Active / Archive switch.
+  document.getElementById('tv-view-seg').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-view]');
+    if (!btn) return;
+    tvView = btn.dataset.view;
+    syncTvViewUI();
+    renderTabVault();
+  });
+
+  // Backup dropdown: copy open tabs into the active list (optionally close them).
+  document.getElementById('tv-backup').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const r = e.currentTarget.getBoundingClientRect();
+    showContextMenu(r.left, r.bottom, [
+      { label: 'Copy all tabs', action: () => backupCurrentWindow(false) },
+      { label: 'Copy all tabs & close', action: () => backupCurrentWindow(true) }
+    ]);
+  });
+
+  document.getElementById('tv-search').addEventListener('input', renderTabVault);
+}
+
+function syncTvViewUI() {
+  document.querySelectorAll('#tv-view-seg button').forEach(b => {
+    b.classList.toggle('active', b.dataset.view === tvView);
+  });
+}
+
+/* The capturable tabs in the current window (skips chrome://, the extension's
+   own pages, and this New Tab page). */
+async function capturableTabs() {
+  const [allTabs, myTab] = await Promise.all([
+    chrome.tabs.query({ currentWindow: true }),
+    chrome.tabs.getCurrent().catch(() => null)
+  ]);
+  const myId = myTab ? myTab.id : -1;
+  return allTabs.filter(t =>
+    t.id !== myId &&
+    t.url &&
+    !t.url.startsWith('chrome://') &&
+    !t.url.startsWith('chrome-extension://')
+  );
+}
+
+// Backup the current window into a new ACTIVE list. close=true also closes the
+// captured tabs (the old "snapshot" behavior). No dedup here — the user may
+// intentionally back up the same window more than once.
+async function backupCurrentWindow(close) {
+  const [toCapture, win] = await Promise.all([
+    capturableTabs(),
+    chrome.windows.getCurrent().catch(() => null)
+  ]);
+  if (toCapture.length === 0) {
+    window.alert('No capturable tabs in this window.');
+    return;
+  }
+
+  const now = new Date();
+  const label =
+    now.toLocaleDateString([], { day: 'numeric', month: 'short' }) +
+    ' · ' +
+    now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  const list = {
+    id: Store.uid('tl'),
+    label,
+    savedAt: Date.now(),
+    archived: false,
+    // Remember the window's place/size so "Open in new window" can restore it
+    // on the same monitor (multi-monitor setups).
+    win: win ? { left: win.left, top: win.top, width: win.width, height: win.height, state: win.state } : null,
+    tabs: toCapture.map(t => ({
+      url: t.url,
+      title: t.title || hostnameOf(t.url),
+      favicon: t.favIconUrl || ''
+    }))
+  };
+
+  if (!state.tabLists) state.tabLists = [];
+  state.tabLists.unshift(list);
+  trimLists();
+  await Store.save(state);
+
+  if (close) await chrome.tabs.remove(toCapture.map(t => t.id));
+  tvView = 'active';
+  syncTvViewUI();
+  renderTabVault();
+}
+
+// Open a set of tabs in the CURRENT window (first active, rest discarded once
+// loaded so they don't all eat memory).
+async function openTabsHere(tabs) {
+  if (!tabs || tabs.length === 0) return;
+  await chrome.tabs.create({ url: tabs[0].url, active: true });
+  const backgroundIds = [];
+  for (const t of tabs.slice(1)) {
+    const tab = await chrome.tabs.create({ url: t.url, active: false });
+    backgroundIds.push(tab.id);
+  }
+  if (backgroundIds.length > 0) {
+    chrome.runtime.sendMessage({ type: 'discard-after-load', tabIds: backgroundIds }).catch(() => {});
+  }
+}
+
+// Open a set of tabs in a NEW window, restoring the saved position/size when we
+// have one (all but the first are discarded once loaded). Chrome won't accept
+// explicit bounds together with a maximized/fullscreen state, so we pick one.
+async function openTabsNewWindow(tabs, win) {
+  if (!tabs || tabs.length === 0) return;
+  const opts = { url: tabs.map(t => t.url), focused: true };
+  if (win && (win.state === 'maximized' || win.state === 'fullscreen')) {
+    opts.state = win.state;
+  } else if (win && Number.isFinite(win.left)) {
+    opts.left = win.left; opts.top = win.top; opts.width = win.width; opts.height = win.height;
+  }
+  const w = await chrome.windows.create(opts);
+  const bgIds = (w.tabs || []).slice(1).map(t => t.id);
+  if (bgIds.length > 0) {
+    chrome.runtime.sendMessage({ type: 'discard-after-load', tabIds: bgIds }).catch(() => {});
+  }
+}
+
+const openInThisWindow = (list) => openTabsHere(list.tabs);
+const openInNewWindow = (list) => openTabsNewWindow(list.tabs, list.win);
+
+// Unordered set of URLs — the identity used to dedupe archive entries.
+function urlKey(list) {
+  return [...new Set((list.tabs || []).map(t => t.url))].sort().join('\n');
+}
+
+// Move an ACTIVE list into the archive. If an archive entry with identical
+// content (same URL set) already exists, drop the incoming one and just bump
+// the existing entry to the top instead of creating a duplicate.
+async function archiveList(list) {
+  const key = urlKey(list);
+  const dup = (state.tabLists || []).find(l => l.archived && l !== list && urlKey(l) === key);
+  if (dup) {
+    state.tabLists = state.tabLists.filter(l => l.id !== list.id);
+    dup.savedAt = Date.now();
+  } else {
+    list.archived = true;
+    list.savedAt = Date.now();
+  }
+  trimLists();
+  await Store.save(state);
+  renderTabVault();
+}
+
+// Permanently remove a list (used from the archive view).
+async function deleteTabList(id) {
+  state.tabLists = (state.tabLists || []).filter(l => l.id !== id);
+  await Store.save(state);
+  renderTabVault();
+}
+
+// Remove the given tabs from a list (never archived). Drops the list if emptied.
+async function deleteTabsFromList(list, doomed) {
+  const set = new Set(doomed);
+  list.tabs = list.tabs.filter(t => !set.has(t));
+  if (list.tabs.length === 0) {
+    state.tabLists = state.tabLists.filter(l => l.id !== list.id);
+  }
+  await Store.save(state);
+  renderTabVault();
+}
+
+// Keep at most TV_CAP lists per view, newest (savedAt) first; oldest fall off.
+function trimLists() {
+  const all = state.tabLists || [];
+  const active = all.filter(l => !l.archived).sort((a, b) => b.savedAt - a.savedAt).slice(0, TV_CAP);
+  const archive = all.filter(l => l.archived).sort((a, b) => b.savedAt - a.savedAt).slice(0, TV_CAP);
+  state.tabLists = [...active, ...archive];
+}
+
+// The dropdown shown by each list's "This group ▾" button.
+function showGroupListMenu(x, y, list) {
+  if (list.archived) {
+    showContextMenu(x, y, [
+      { label: 'Open in this window', action: () => openInThisWindow(list) },
+      { label: 'Open in new window', action: () => openInNewWindow(list) },
+      { separator: true },
+      { label: 'Delete', danger: true, action: () => {
+          if (window.confirm('Delete this archived group? This cannot be undone.')) deleteTabList(list.id);
+      } }
+    ]);
+  } else {
+    showContextMenu(x, y, [
+      { label: 'Open in this window', action: async () => { await openInThisWindow(list); await archiveList(list); } },
+      { label: 'Open in new window', action: async () => { await openInNewWindow(list); await archiveList(list); } },
+      { separator: true },
+      { label: 'Delete group', danger: true, action: () => {
+          if (window.confirm('Delete this group? It will be moved to the archive.')) archiveList(list);
+      } }
+    ]);
+  }
+}
+
+function renderTabVault() {
+  const container = document.getElementById('tv-lists');
+  const searchVal = document.getElementById('tv-search').value.trim().toLowerCase();
+  const lists = (state.tabLists || [])
+    .filter(l => !!l.archived === (tvView === 'archive'))
+    .sort((a, b) => b.savedAt - a.savedAt);
+
+  container.innerHTML = '';
+
+  const groups = lists
+    .map(list => ({
+      list,
+      tabs: searchVal
+        ? list.tabs.filter(t =>
+            (t.title || '').toLowerCase().includes(searchVal) ||
+            (t.url || '').toLowerCase().includes(searchVal))
+        : list.tabs
+    }))
+    .filter(g => !searchVal || g.tabs.length > 0);
+
+  if (groups.length === 0) {
+    const msg = document.createElement('p');
+    msg.className = 'tv-empty';
+    msg.textContent = searchVal
+      ? 'No matches'
+      : (tvView === 'archive' ? 'Archive is empty.' : 'No saved tab lists yet.');
+    container.appendChild(msg);
+    return;
+  }
+
+  for (const { list, tabs } of groups) {
+    const sec = document.createElement('div');
+    sec.className = 'tvl' + (list.archived ? ' archived' : '');
+
+    const hdr = document.createElement('div');
+    hdr.className = 'tvl-header';
+
+    const lbl = document.createElement('span');
+    lbl.className = 'tvl-label';
+    lbl.textContent = list.label;
+    lbl.title = list.label;
+
+    const cnt = document.createElement('span');
+    cnt.className = 'tvl-count';
+    cnt.textContent = list.tabs.length + ' tabs';
+
+    const grp = document.createElement('button');
+    grp.className = 'tvl-group';
+    grp.textContent = 'This group ▾';
+    grp.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const r = e.currentTarget.getBoundingClientRect();
+      showGroupListMenu(r.left, r.bottom, list);
+    });
+
+    hdr.append(lbl, cnt, grp);
+
+    const tabsEl = document.createElement('div');
+    tabsEl.className = 'tvl-tabs';
+
+    // checkbox <-> tab pairs, so the footer buttons act on the current selection
+    const rows = [];
+    for (const t of tabs) {
+      const row = document.createElement('label');
+      row.className = 'tvl-tab';
+      row.title = t.title + '\n' + t.url;
+
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'tvl-tab-cb';
+      cb.addEventListener('change', updateFooter);
+
+      const img = document.createElement('img');
+      img.src = faviconURL(t.url, 16);
+      img.alt = '';
+      img.addEventListener('error', () => img.remove());
+
+      const title = document.createElement('span');
+      title.className = 'tvl-tab-title';
+      title.textContent = t.title || hostnameOf(t.url);
+
+      row.append(cb, img, title);
+      tabsEl.appendChild(row);
+      rows.push({ cb, tab: t });
+    }
+
+    // Footer: bulk open / delete for the checked tabs in this group.
+    const foot = document.createElement('div');
+    foot.className = 'tvl-actions';
+
+    const openSel = document.createElement('button');
+    openSel.className = 'tvl-act';
+    openSel.textContent = 'Open selected';
+    openSel.addEventListener('click', () => {
+      const sel = rows.filter(r => r.cb.checked).map(r => r.tab);
+      if (sel.length > 0) openTabsHere(sel);
+    });
+
+    const delSel = document.createElement('button');
+    delSel.className = 'tvl-act danger';
+    delSel.textContent = 'Delete selected';
+    delSel.addEventListener('click', () => {
+      const sel = rows.filter(r => r.cb.checked).map(r => r.tab);
+      if (sel.length === 0) return;
+      if (sel.length > 1 && !window.confirm(`Delete ${sel.length} selected tabs?`)) return;
+      deleteTabsFromList(list, sel);
+    });
+
+    foot.append(openSel, delSel);
+
+    function updateFooter() {
+      const any = rows.some(r => r.cb.checked);
+      foot.classList.toggle('on', any);
+    }
+
+    sec.append(hdr, tabsEl, foot);
+    container.appendChild(sec);
+  }
+}
+
 async function idbGet(key) {
   const db = await idbOpen();
   return new Promise((res, rej) => {
