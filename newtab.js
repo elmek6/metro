@@ -567,6 +567,8 @@ function syncTvViewUI() {
   document.querySelectorAll('#tv-view-seg button').forEach(b => {
     b.classList.toggle('active', b.dataset.view === tvView);
   });
+  // "Backup" copies open tabs into Active — irrelevant in the Recent view.
+  document.getElementById('tv-backup').style.display = tvView === 'recent' ? 'none' : '';
 }
 
 /* The capturable tabs in the current window (skips chrome://, the extension's
@@ -741,6 +743,9 @@ function showGroupListMenu(x, y, list) {
 function renderTabVault() {
   const container = document.getElementById('tv-lists');
   const searchVal = document.getElementById('tv-search').value.trim().toLowerCase();
+
+  if (tvView === 'recent') { renderRecent(container, searchVal); return; }
+
   const lists = (state.tabLists || [])
     .filter(l => !!l.archived === (tvView === 'archive'))
     .sort((a, b) => b.savedAt - a.savedAt);
@@ -856,6 +861,84 @@ function renderTabVault() {
     sec.append(hdr, tabsEl, foot);
     container.appendChild(sec);
   }
+}
+
+/* Recent = Chrome's recently-closed tabs. Meant for quickly finding and
+ * reopening something you just closed — click a row to restore it. The search
+ * box filters this view too. */
+async function renderRecent(container, searchVal) {
+  container.innerHTML = '';
+
+  let sessions = [];
+  try { sessions = await chrome.sessions.getRecentlyClosed(); } catch (_) {}
+
+  // Flatten closed single tabs and the tabs inside closed windows into one
+  // newest-first list. Restore a tab by its own sessionId when present, else
+  // fall back to the parent window's sessionId.
+  const items = [];
+  for (const s of sessions) {
+    if (s.tab) {
+      items.push({ tab: s.tab, sessionId: s.tab.sessionId });
+    } else if (s.window && s.window.tabs) {
+      for (const t of s.window.tabs) {
+        items.push({ tab: t, sessionId: t.sessionId || s.window.sessionId });
+      }
+    }
+  }
+
+  const filtered = searchVal
+    ? items.filter(({ tab }) =>
+        (tab.title || '').toLowerCase().includes(searchVal) ||
+        (tab.url || '').toLowerCase().includes(searchVal))
+    : items;
+
+  // The view may have changed while we awaited the sessions query.
+  if (tvView !== 'recent') return;
+
+  if (filtered.length === 0) {
+    const msg = document.createElement('p');
+    msg.className = 'tv-empty';
+    msg.textContent = searchVal ? 'No matches' : 'No recently closed tabs.';
+    container.appendChild(msg);
+    return;
+  }
+
+  const sec = document.createElement('div');
+  sec.className = 'tvl';
+
+  const tabsEl = document.createElement('div');
+  tabsEl.className = 'tvl-tabs';
+  tabsEl.style.maxHeight = 'none';   // let the whole panel scroll
+
+  for (const { tab, sessionId } of filtered) {
+    const row = document.createElement('div');
+    row.className = 'tvl-tab';
+    row.title = (tab.title || '') + '\n' + (tab.url || '');
+
+    const img = document.createElement('img');
+    img.src = tab.favIconUrl || faviconURL(tab.url, 16);
+    img.alt = '';
+    img.addEventListener('error', () => img.remove());
+
+    const title = document.createElement('span');
+    title.className = 'tvl-tab-title';
+    title.textContent = tab.title || hostnameOf(tab.url);
+
+    row.append(img, title);
+    row.addEventListener('click', () => restoreClosed(sessionId));
+    tabsEl.appendChild(row);
+  }
+
+  sec.appendChild(tabsEl);
+  container.appendChild(sec);
+}
+
+// Reopen a recently-closed tab/window. Chrome drops it from the list once
+// restored, so re-render to reflect that.
+async function restoreClosed(sessionId) {
+  if (!sessionId) return;
+  try { await chrome.sessions.restore(sessionId); } catch (_) {}
+  renderTabVault();
 }
 
 async function idbGet(key) {

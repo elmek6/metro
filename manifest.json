@@ -3,7 +3,7 @@
   "name": "Metro New Tab",
   "version": "0.3.0",
   "description": "A Windows 8 Metro-style new tab page: colored tiles, groups, drag-and-drop, and live tiles.",
-  "permissions": ["storage", "favicon", "tabs"],
+  "permissions": ["storage", "favicon", "tabs", "sessions"],
   "background": {
     "service_worker": "background.js"
   },
