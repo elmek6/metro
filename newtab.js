@@ -22,7 +22,7 @@ let modalType = 'shortcut';// 'shortcut' | 'clock' — what the modal is editing
 let pickedColor = PALETTE[4];
 let clockEls = [];         // {time, weekday, date} element triples for the clock
 let sortables = [];        // active Sortable instances (destroyed before re-render)
-let tvView = 'active';     // Tab Vault view: 'active' | 'archive'
+let tvView = 'active';     // Tab Vault view: 'active' | 'archive' | 'recent' | 'double'
 const TV_CAP = 30;         // max lists kept per view (active / archive)
 
 init();
@@ -567,8 +567,10 @@ function syncTvViewUI() {
   document.querySelectorAll('#tv-view-seg button').forEach(b => {
     b.classList.toggle('active', b.dataset.view === tvView);
   });
-  // "Backup" copies open tabs into Active — irrelevant in the Recent view.
-  document.getElementById('tv-backup').style.display = tvView === 'recent' ? 'none' : '';
+  // "Backup" copies open tabs into Active — irrelevant in the read-only
+  // Recent and Double views.
+  const readOnly = tvView === 'recent' || tvView === 'double';
+  document.getElementById('tv-backup').style.display = readOnly ? 'none' : '';
 }
 
 /* The capturable tabs in the current window (skips chrome://, the extension's
@@ -745,6 +747,7 @@ function renderTabVault() {
   const searchVal = document.getElementById('tv-search').value.trim().toLowerCase();
 
   if (tvView === 'recent') { renderRecent(container, searchVal); return; }
+  if (tvView === 'double') { renderDouble(container, searchVal); return; }
 
   const lists = (state.tabLists || [])
     .filter(l => !!l.archived === (tvView === 'archive'))
@@ -939,6 +942,134 @@ async function restoreClosed(sessionId) {
   if (!sessionId) return;
   try { await chrome.sessions.restore(sessionId); } catch (_) {}
   renderTabVault();
+}
+
+/* Double = duplicate open tabs. Scans every open tab in ALL windows, groups the
+ * ones that share the exact same URL, and shows only the groups with more than
+ * one copy. Click a row to jump to that specific tab (activating it and
+ * focusing its window); the × closes just that copy. chrome://, edge://,
+ * about: and extension pages are skipped so multiple New Tab pages don't read
+ * as "duplicates". The search box filters by title or URL. */
+async function renderDouble(container, searchVal) {
+  container.innerHTML = '';
+
+  let tabs = [];
+  try { tabs = await chrome.tabs.query({}); } catch (_) {}
+
+  // The view may have changed while we awaited the query.
+  if (tvView !== 'double') return;
+
+  const isInternal = (url) =>
+    !url ||
+    url.startsWith('chrome://') ||
+    url.startsWith('edge://') ||
+    url.startsWith('about:') ||
+    url.startsWith('chrome-extension://');
+
+  // Stable per-window numbering so identical copies stay tellable apart.
+  const winIds = [...new Set(tabs.map(t => t.windowId))].sort((a, b) => a - b);
+  const winNum = new Map(winIds.map((id, i) => [id, i + 1]));
+
+  // Group by exact URL.
+  const byUrl = new Map();
+  for (const t of tabs) {
+    if (isInternal(t.url)) continue;
+    if (!byUrl.has(t.url)) byUrl.set(t.url, []);
+    byUrl.get(t.url).push(t);
+  }
+
+  // Keep only the URLs open more than once, most-duplicated first.
+  let groups = [...byUrl.entries()]
+    .filter(([, ts]) => ts.length >= 2)
+    .map(([url, ts]) => ({ url, tabs: ts }));
+
+  if (searchVal) {
+    groups = groups.filter(g =>
+      g.url.toLowerCase().includes(searchVal) ||
+      g.tabs.some(t => (t.title || '').toLowerCase().includes(searchVal)));
+  }
+
+  groups.sort((a, b) => b.tabs.length - a.tabs.length);
+
+  if (groups.length === 0) {
+    const msg = document.createElement('p');
+    msg.className = 'tv-empty';
+    msg.textContent = searchVal ? 'No matches' : 'No duplicate tabs open.';
+    container.appendChild(msg);
+    return;
+  }
+
+  for (const g of groups) {
+    const sec = document.createElement('div');
+    sec.className = 'tvl';
+
+    const hdr = document.createElement('div');
+    hdr.className = 'tvl-header';
+
+    const lbl = document.createElement('span');
+    lbl.className = 'tvl-label';
+    lbl.textContent = g.url;                              // show the URL on screen
+    lbl.title = g.tabs[0].title || hostnameOf(g.url);     // hover → page/site name
+
+    const cnt = document.createElement('span');
+    cnt.className = 'tvl-count';
+    cnt.textContent = g.tabs.length + ' copies';
+
+    hdr.append(lbl, cnt);
+
+    const tabsEl = document.createElement('div');
+    tabsEl.className = 'tvl-tabs';
+
+    for (const t of g.tabs) {
+      const row = document.createElement('div');
+      row.className = 'tvl-tab';
+      row.title = (t.title || '') + '\n' + (t.url || '');
+
+      const img = document.createElement('img');
+      img.src = t.favIconUrl || faviconURL(t.url, 16);
+      img.alt = '';
+      img.addEventListener('error', () => img.remove());
+
+      const title = document.createElement('span');
+      title.className = 'tvl-tab-title';
+      title.textContent = t.title || hostnameOf(t.url);
+
+      const win = document.createElement('span');
+      win.className = 'tvl-tab-win';
+      win.textContent = 'win ' + (winNum.get(t.windowId) || '?');
+
+      const close = document.createElement('button');
+      close.className = 'tvl-tab-close';
+      close.textContent = '×';
+      close.title = 'Close this tab';
+      close.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        try { await chrome.tabs.remove(t.id); } catch (_) {}
+        // Drop ONLY the clicked copy — leave the rest of the group in place.
+        row.remove();
+        const left = tabsEl.querySelectorAll('.tvl-tab').length;
+        cnt.textContent = left + (left === 1 ? ' copy' : ' copies');
+        if (left === 0) sec.remove();
+      });
+
+      row.append(img, title, win, close);
+      // Click jumps to that tab and tints the row so you can tell which copies
+      // you've already opened.
+      row.addEventListener('click', () => { focusTab(t); row.classList.add('opened'); });
+      tabsEl.appendChild(row);
+    }
+
+    sec.append(hdr, tabsEl);
+    container.appendChild(sec);
+  }
+}
+
+// Jump to an already-open tab: activate it and focus its window.
+async function focusTab(tab) {
+  try {
+    await chrome.tabs.update(tab.id, { active: true });
+    if (tab.windowId != null) await chrome.windows.update(tab.windowId, { focused: true });
+  } catch (_) {}
 }
 
 async function idbGet(key) {

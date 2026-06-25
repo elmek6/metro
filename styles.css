@@ -265,9 +265,18 @@ html, body {
   opacity: 0;
   pointer-events: none;
   z-index: 9998;            /* above everything when asleep */
-  transition: opacity .8s ease;
+  /* Waking (back to opacity 0) clears quickly — the transition on the *base*
+     state applies when leaving .on. */
+  transition: opacity .25s ease-out;
 }
-#sleep-overlay.on { opacity: 1; pointer-events: auto; cursor: none; }
+#sleep-overlay.on {
+  opacity: 1;
+  pointer-events: auto;
+  cursor: none;
+  /* Falling asleep eases in slowly so the screen drifts to black instead of
+     snapping dark. The transition on .on applies when entering it. */
+  transition: opacity 4s ease-in;
+}
 
 /* ---------- Settings panel ---------- */
 #settings-panel {
@@ -502,12 +511,43 @@ button.danger:hover { background: #c91200; }
 .tvl-tab-cb { flex-shrink: 0; accent-color: #1ba1e2; cursor: pointer; margin: 0; }
 .tvl-tab img { width: 14px; height: 14px; flex-shrink: 0; object-fit: contain; }
 .tvl-tab-title {
+  flex: 1;
+  min-width: 0;
   font-size: 12px;
   line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Double view: which window a duplicate lives in, and a hover-to-close ×. */
+.tvl-tab-win {
+  flex-shrink: 0;
+  font-size: 10px;
+  opacity: .4;
+  white-space: nowrap;
+}
+.tvl-tab-close {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  line-height: 1;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, .5);
+  font-size: 15px;
+  cursor: pointer;
+  border-radius: 2px;
+  opacity: 0;
+}
+.tvl-tab:hover .tvl-tab-close { opacity: 1; }
+.tvl-tab-close:hover { background: #c0392b; color: #fff; }
+
+/* A copy you've already jumped to is tinted darker so you can track which
+   pages you've opened from a duplicate group. */
+.tvl-tab.opened { background: rgba(0, 0, 0, .32); color: rgba(255, 255, 255, .45); }
+.tvl-tab.opened:hover { background: rgba(0, 0, 0, .4); color: rgba(255, 255, 255, .6); }
 
 /* Bulk actions appear once at least one tab in the group is checked. */
 .tvl-actions {
